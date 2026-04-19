@@ -36,6 +36,7 @@ import {
   HelpOption,
   MAX_WIDTH,
   RenderOptions,
+  frame,
   renderAliasHelp,
   renderCommandHelp,
   renderError,
@@ -1009,7 +1010,8 @@ class WebpackCLI {
     return {
       colors: this.colors,
       log: (line) => this.logger.raw(line),
-      columns: process.stdout.columns ?? MAX_WIDTH, // import MAX_WIDTH from ui-renderer
+      // we mirror the way commander handle the width here as calling it directly will cause an infinite loop
+      columns: process.stdout.columns ?? MAX_WIDTH, // import MAX_WIDTH from ui-renderer instead of hardcode 80 even if it's consider as the standard
     };
   }
 
@@ -1823,18 +1825,24 @@ class WebpackCLI {
         },
       ],
       action: async (options: { output?: string }) => {
-        const rawInfo = await this.#getInfoOutput({
-          information: {
-            npmPackages: `{${DEFAULT_WEBPACK_PACKAGES.map((item) => `*${item}*`).join(",")}}`,
-          },
-        });
-
         if (options.output) {
           this.logger.raw(await this.#renderVersion(options));
           return;
         }
 
-        renderVersionOutput(rawInfo, this.#renderOptions());
+        await frame(
+          { name: "version", description: "Installed package versions." },
+          async (option) =>
+            renderVersionOutput(
+              await this.#getInfoOutput({
+                information: {
+                  npmPackages: `{${DEFAULT_WEBPACK_PACKAGES.map((item) => `*${item}*`).join(",")}}`,
+                },
+              }),
+              option,
+            ),
+          this.#renderOptions(),
+        );
       },
     },
     info: {
@@ -1872,7 +1880,11 @@ class WebpackCLI {
           return;
         }
 
-        renderInfoOutput(info, this.#renderOptions());
+        await frame(
+          { name: "info", description: "System and environment information." },
+          (option) => renderInfoOutput(info, option),
+          this.#renderOptions(),
+        );
       },
     },
     configtest: {
@@ -1894,7 +1906,6 @@ class WebpackCLI {
           configPath ? { env, argv, webpack, config: [configPath] } : { env, argv, webpack },
         );
         const configPaths = new Set<string>();
-        const renderOpts = this.#renderOptions();
 
         if (Array.isArray(config.options)) {
           for (const options of config.options) {
@@ -1912,21 +1923,27 @@ class WebpackCLI {
           }
         }
 
-        if (configPaths.size === 0) {
-          renderError("No configuration found.", renderOpts);
-          process.exit(2);
-        }
-        renderWarning(`Validating: ${[...configPaths].join(", ")}`, renderOpts);
-        try {
-          cmd.context.webpack.validate(config.options);
-        } catch (error) {
-          renderError(
-            this.isValidationError(error as Error) ? (error as Error).message : String(error),
-            renderOpts,
-          );
-          process.exit(2);
-        }
-        renderSuccess("No validation errors found.", renderOpts);
+        await frame(
+          { name: "configtest", description: "Validating your webpack configuration." },
+          async (option) => {
+            if (configPaths.size === 0) {
+              renderError("No configuration found.", option);
+              process.exit(2);
+            }
+            renderWarning(`Validating: ${[...configPaths].join(", ")}`, option);
+            try {
+              cmd.context.webpack.validate(config.options);
+            } catch (error) {
+              renderError(
+                this.isValidationError(error as Error) ? (error as Error).message : String(error),
+                option,
+              );
+              process.exit(2);
+            }
+            renderSuccess("No validation errors found.", option);
+          },
+          this.#renderOptions(),
+        );
       },
     },
   };

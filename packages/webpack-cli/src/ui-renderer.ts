@@ -59,6 +59,12 @@ export interface CommandHelpData {
   globalOptions: HelpOption[];
 }
 
+/** Passed to `renderCommandHeader` to describe the running command. */
+export interface CommandMeta {
+  name: string;
+  description: string;
+}
+
 /** One section emitted by `renderInfoOutput`, e.g. "System" or "Binaries". */
 export interface InfoSection {
   title: string;
@@ -130,6 +136,23 @@ export function renderRows(
     for (let i = 1; i < lines.length; i++) {
       log(`${continuation}${colorFn(lines[i])}`);
     }
+  }
+}
+
+export function renderCommandHeader(meta: CommandMeta, opts: RenderOptions): void {
+  const { colors, log } = opts;
+  const termWidth = Math.min(opts.columns || MAX_WIDTH, MAX_WIDTH);
+
+  log("");
+  log(`${indent(INDENT)}${colors.bold(colors.cyan("⬡"))} ${colors.bold(`webpack ${meta.name}`)}`);
+  log(divider(termWidth, colors));
+
+  if (meta.description) {
+    const descWidth = termWidth - INDENT * 2;
+    for (const line of wrapValue(meta.description, descWidth)) {
+      log(`${indent(INDENT)}${line}`);
+    }
+    log("");
   }
 }
 
@@ -360,4 +383,14 @@ export function renderFooter(opts: RenderOptions, footer: FooterOptions = {}): v
   );
   log(`  ${colors.bold("Made with")} ${colors.red("♥")}  ${colors.bold("by the webpack team")}`);
   log("");
+}
+
+export async function frame(
+  meta: CommandMeta,
+  func: (opts: RenderOptions) => void | Promise<void>,
+  opts: RenderOptions,
+): Promise<void> {
+  renderCommandHeader(meta, opts);
+  await func(opts);
+  renderFooter(opts);
 }
