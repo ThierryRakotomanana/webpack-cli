@@ -5,6 +5,7 @@
     "module": "esnext",
     "strict": true,
     "moduleResolution": "bundler",
+    "jsx": "preserve",
     "skipLibCheck": true,
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
