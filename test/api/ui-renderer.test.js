@@ -1,8 +1,10 @@
 const {
   INDENT,
   MAX_WIDTH,
+  frame,
   parseEnvinfoSections,
   renderAliasHelp,
+  renderCommandHeader,
   renderCommandHelp,
   renderError,
   renderFooter,
@@ -659,6 +661,137 @@ describe("renderFooter", () => {
   it("should match snapshot (verbose)", () => {
     const { captured, opts } = makeOpts();
     renderFooter(opts, { verbose: true });
+    expect(captured).toMatchSnapshot();
+  });
+});
+
+describe("renderCommandHeader", () => {
+  it("should render 'webpack <name>' in the header", () => {
+    const { captured, opts } = makeOpts();
+    renderCommandHeader({ name: "version", description: "Installed package versions." }, opts);
+    expect(getOutput(captured)).toContain("webpack version");
+  });
+
+  it("should render the description", () => {
+    const { captured, opts } = makeOpts();
+    renderCommandHeader({ name: "version", description: "Installed package versions." }, opts);
+    expect(getOutput(captured)).toContain("Installed package versions.");
+  });
+
+  it("should render a divider", () => {
+    const { captured, opts } = makeOpts();
+    renderCommandHeader({ name: "version", description: "Installed package versions." }, opts);
+    expect(captured.some((l) => /─{10,}/.test(l))).toBe(true);
+  });
+
+  it("should include the ⬡ icon", () => {
+    const { captured, opts } = makeOpts();
+    renderCommandHeader({ name: "version", description: "Installed package versions." }, opts);
+    expect(getOutput(captured)).toContain("⬡");
+  });
+});
+
+describe("frame", () => {
+  it("should render the command header", async () => {
+    const { captured, opts } = makeOpts();
+    await frame(
+      { name: "info", description: "System and environment information." },
+      () => {},
+      opts,
+    );
+    expect(getOutput(captured)).toContain("webpack info");
+  });
+
+  it("should render the description in the header", async () => {
+    const { captured, opts } = makeOpts();
+    await frame(
+      { name: "info", description: "System and environment information." },
+      () => {},
+      opts,
+    );
+    expect(getOutput(captured)).toContain("System and environment information.");
+  });
+
+  it("should render the footer", async () => {
+    const { captured, opts } = makeOpts();
+    await frame(
+      { name: "info", description: "System and environment information." },
+      () => {},
+      opts,
+    );
+    expect(getOutput(captured)).toContain("https://webpack.js.org/");
+  });
+
+  it("should call the fn callback", async () => {
+    const { opts } = makeOpts();
+    let called = false;
+    await frame(
+      { name: "info", description: "System and environment information." },
+      () => {
+        called = true;
+      },
+      opts,
+    );
+    expect(called).toBe(true);
+  });
+
+  it("should pass opts to the fn callback", async () => {
+    const { opts } = makeOpts();
+    let receivedOpts;
+    await frame(
+      { name: "info", description: "System and environment information." },
+      (option) => {
+        receivedOpts = option;
+      },
+      opts,
+    );
+    expect(receivedOpts).toBe(opts);
+  });
+
+  it("should await an async fn callback", async () => {
+    const { captured, opts } = makeOpts();
+    await frame(
+      { name: "info", description: "System and environment information." },
+      async (option) => {
+        await Promise.resolve();
+        option.log("async content");
+      },
+      opts,
+    );
+    expect(getOutput(captured)).toContain("async content");
+  });
+
+  it("should render header before fn output and footer after", async () => {
+    const { captured, opts } = makeOpts();
+    await frame(
+      { name: "info", description: "System and environment information." },
+      (option) => {
+        option.log("fn output");
+      },
+      opts,
+    );
+    const headerIdx = captured.findIndex((l) => l.includes("webpack info"));
+    const fnIdx = captured.findIndex((l) => l.includes("fn output"));
+    const footerIdx = captured.findIndex((l) => l.includes("https://webpack.js.org/"));
+    expect(headerIdx).toBeLessThan(fnIdx);
+    expect(fnIdx).toBeLessThan(footerIdx);
+  });
+
+  it("should work without a description", async () => {
+    const { captured, opts } = makeOpts();
+    await frame({ name: "info" }, () => {}, opts);
+    expect(getOutput(captured)).toContain("webpack info");
+  });
+
+  it("should match snapshot", async () => {
+    const { captured, opts } = makeOpts();
+    await frame(
+      { name: "info", description: "System and environment information." },
+      (option) => {
+        option.log("  some content");
+      },
+      opts,
+    );
     expect(captured).toMatchSnapshot();
   });
 });
